@@ -8,9 +8,9 @@ from keras_unet_collection.transformer_layers import patch_extract, patch_embedd
 from keras_unet_collection._backbone_zoo import backbone_zoo, bach_norm_checker
 
 import tensorflow as tf
-from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Layer, MultiHeadAttention, LayerNormalization, Dense, Embedding
+from keras.layers import Input
+from keras.models import Model
+from keras.layers import Layer, MultiHeadAttention, LayerNormalization, Dense, Embedding
     
 def ViT_MLP(X, filter_num, activation='GELU', name='MLP'):
     '''

@@ -4,8 +4,8 @@ from __future__ import absolute_import
 from keras_unet_collection.layer_utils import *
 from keras_unet_collection.transformer_layers import patch_extract, patch_embedding, SwinTransformerBlock, patch_merging, patch_expanding
 
-from tensorflow.keras.layers import Input, Dense
-from tensorflow.keras.models import Model
+from keras.layers import Input, Dense
+from keras.models import Model
 
 def swin_transformer_stack(X, stack_num, embed_dim, num_patch, num_heads, window_size, num_mlp, shift_window=True, name=''):
     '''

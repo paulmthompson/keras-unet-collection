@@ -1,8 +1,8 @@
 
 from __future__ import absolute_import
 
-from tensorflow.keras.applications import *
-from tensorflow.keras.models import Model
+from keras.applications import *
+from keras.models import Model
 
 from keras_unet_collection.utils import freeze_model
 

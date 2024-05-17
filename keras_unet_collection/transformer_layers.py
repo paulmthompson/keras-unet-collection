@@ -5,8 +5,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.nn import depth_to_space
 from tensorflow.image import extract_patches
-from tensorflow.keras.layers import Conv2D, Layer, Dense, Embedding, Dropout, Conv2D, LayerNormalization
-from tensorflow.keras.activations import softmax
+from keras.layers import Conv2D, Layer, Dense, Embedding, Dropout, Conv2D, LayerNormalization
+from keras.activations import softmax
 
 class patch_extract(Layer):
     '''

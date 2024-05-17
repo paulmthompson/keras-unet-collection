@@ -4,10 +4,10 @@ from __future__ import absolute_import
 from keras_unet_collection.activations import GELU, Snake
 from tensorflow import expand_dims
 from tensorflow.compat.v1 import image
-from tensorflow.keras.layers import MaxPooling2D, AveragePooling2D, UpSampling2D, Conv2DTranspose, GlobalAveragePooling2D
-from tensorflow.keras.layers import Conv2D, DepthwiseConv2D, Lambda
-from tensorflow.keras.layers import BatchNormalization, Activation, concatenate, multiply, add
-from tensorflow.keras.layers import ReLU, LeakyReLU, PReLU, ELU, Softmax
+from keras.layers import MaxPooling2D, AveragePooling2D, UpSampling2D, Conv2DTranspose, GlobalAveragePooling2D
+from keras.layers import Conv2D, DepthwiseConv2D, Lambda
+from keras.layers import BatchNormalization, Activation, concatenate, multiply, add
+from keras.layers import ReLU, LeakyReLU, PReLU, ELU, Softmax
 
 def decode_layer(X, channel, pool_size, unpool, kernel_size=3, 
                  activation='ReLU', batch_norm=False, name='decode'):

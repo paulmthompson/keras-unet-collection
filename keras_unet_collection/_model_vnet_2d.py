@@ -4,8 +4,8 @@ from __future__ import absolute_import
 from keras_unet_collection.layer_utils import *
 from keras_unet_collection.activations import GELU, Snake
 
-from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Model
+from keras.layers import Input
+from keras.models import Model
 
 
 def vnet_left(X, channel, res_num, activation='ReLU', pool=True, batch_norm=False, name='left'):

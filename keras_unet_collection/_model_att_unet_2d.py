@@ -6,8 +6,8 @@ from keras_unet_collection.activations import GELU, Snake
 from keras_unet_collection._model_unet_2d import UNET_left, UNET_right
 from keras_unet_collection._backbone_zoo import backbone_zoo, bach_norm_checker
 
-from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Model
+from keras.layers import Input
+from keras.models import Model
 
 
 def UNET_att_right(X, X_left, channel, att_channel, kernel_size=3, stack_num=2,

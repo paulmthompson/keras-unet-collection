@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras.backend as K
+import keras.backend as K
 
 def _crps_tf(y_true, y_pred, factor=0.05):
     

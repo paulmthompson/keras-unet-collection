@@ -5,8 +5,8 @@ from keras_unet_collection.layer_utils import *
 from keras_unet_collection.activations import GELU, Snake
 from keras_unet_collection._backbone_zoo import backbone_zoo, bach_norm_checker
 
-from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Model
+from keras.layers import Input
+from keras.models import Model
 
 def UNET_left(X, channel, kernel_size=3, stack_num=2, activation='ReLU', 
               pool=True, batch_norm=False, name='left0'):

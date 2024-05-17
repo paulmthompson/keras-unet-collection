@@ -4,8 +4,8 @@ from __future__ import absolute_import
 from keras_unet_collection.layer_utils import *
 from keras_unet_collection.activations import GELU, Snake
 
-from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Model
+from keras.layers import Input
+from keras.models import Model
 
 
 def RSU(X, channel_in, channel_out, depth=5, activation='ReLU', batch_norm=True, pool=True, unpool=True, name='RSU'):
