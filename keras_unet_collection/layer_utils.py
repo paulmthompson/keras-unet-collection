@@ -7,7 +7,7 @@ from tensorflow.compat.v1 import image
 from keras.layers import MaxPooling2D, AveragePooling2D, UpSampling2D, Conv2DTranspose, GlobalAveragePooling2D
 from keras.layers import Conv2D, DepthwiseConv2D, Lambda
 from keras.layers import BatchNormalization, Activation, concatenate, multiply, add
-from keras.layers import Dropout
+from keras.layers import Dropout, SpatialDropout2D
 from keras import regularizers
 from keras.layers import ReLU, LeakyReLU, PReLU, ELU, Softmax
 
@@ -252,7 +252,10 @@ def CONV_stack(X, channel, kernel_size=3, stack_num=2,
         X = activation_func(name='{}_{}_activation'.format(name, i))(X)
 
         if dropout:
-            X = Dropout(dropout_rate, name='{}_{}_dropout'.format(name, i))(X)
+            if X.shape[1] > 32:
+                X = SpatialDropout2D(dropout_rate, name='{}_{}_dropout'.format(name, i))(X)
+            else:
+                X = Dropout(dropout_rate, name='{}_{}_dropout'.format(name, i))(X)
         
     return X
 
