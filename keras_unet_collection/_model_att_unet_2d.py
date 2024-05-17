@@ -13,6 +13,7 @@ from keras.models import Model
 def UNET_att_right(X, X_left, channel, att_channel, kernel_size=3, stack_num=2,
                    activation='ReLU', atten_activation='ReLU', attention='add',
                    dropout_rate=0.2, dropout=False,
+                   l2_regularization=False, l2_weight=1e-4,
                    unpool=True, batch_norm=False, name='right0'):
     '''
     the decoder block of Attention U-net.
@@ -58,14 +59,17 @@ def UNET_att_right(X, X_left, channel, att_channel, kernel_size=3, stack_num=2,
     
     # stacked linear convolutional layers after concatenation
     H = CONV_stack(H, channel, kernel_size, stack_num=stack_num, activation=activation,
-                    dropout_rate=dropout_rate, dropout=dropout,
+                   dropout_rate=dropout_rate, dropout=dropout,
+                   l2_regularization=l2_regularization, l2_weight=l2_weight,
                    batch_norm=batch_norm, name='{}_conv_after_concat'.format(name))
     
     return H
 
 def att_unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
                      activation='ReLU', atten_activation='ReLU', attention='add',
-                     dropout=False, dropout_rate=0.2, batch_norm=False, pool=True, unpool=True,
+                     dropout=False, dropout_rate=0.2,
+                     l2_regularization=False, l2_weight=1e-4,
+                     batch_norm=False, pool=True, unpool=True,
                      backbone=None, weights='imagenet', freeze_backbone=True, freeze_batch_norm=True, name='attunet'):
     '''
     The base of Attention U-net with an optional ImageNet backbone
@@ -130,11 +134,14 @@ def att_unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
         # downsampling blocks
         X = CONV_stack(X, filter_num[0], stack_num=stack_num_down, activation=activation,
                        dropout_rate=dropout_rate, dropout=dropout,
+                       l2_regularization=l2_regularization, l2_weight=l2_weight,
                        batch_norm=batch_norm, name='{}_down0'.format(name))
         X_skip.append(X)
 
         for i, f in enumerate(filter_num[1:]):
-            X = UNET_left(X, f, stack_num=stack_num_down, activation=activation, pool=pool, 
+            X = UNET_left(X, f, stack_num=stack_num_down, activation=activation, pool=pool,
+                          dropout=dropout, dropout_rate=dropout_rate,
+                          l2_regularization=l2_regularization, l2_weight=l2_weight,
                           batch_norm=batch_norm, name='{}_down{}'.format(name, i+1))        
             X_skip.append(X)
 
@@ -164,7 +171,10 @@ def att_unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
             for i in range(depth_-depth_encode):
                 i_real = i + depth_encode
 
-                X = UNET_left(X, filter_num[i_real], stack_num=stack_num_down, activation=activation, pool=pool, 
+                X = UNET_left(X, filter_num[i_real], stack_num=stack_num_down, activation=activation,
+                              dropout=dropout, dropout_rate=dropout_rate,
+                              l2_regularization=l2_regularization, l2_weight=l2_weight,
+                              pool=pool,
                               batch_norm=batch_norm, name='{}_down{}'.format(name, i_real+1))
                 X_skip.append(X)
 
@@ -192,11 +202,16 @@ def att_unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
         for i in range(depth_-depth_decode-1):
             i_real = i + depth_decode
             X = UNET_right(X, None, filter_num_decode[i_real], stack_num=stack_num_up, activation=activation, 
-                       unpool=unpool, batch_norm=batch_norm, concat=False, name='{}_up{}'.format(name, i_real)) 
+                       unpool=unpool,
+                       dropout_rate=dropout_rate, dropout=dropout,
+                       l2_regularization=l2_regularization, l2_weight=l2_weight,
+                       batch_norm=batch_norm, concat=False, name='{}_up{}'.format(name, i_real))
     return X
 
 def att_unet_2d(input_size, filter_num, n_labels, stack_num_down=2, stack_num_up=2, activation='ReLU', 
-                atten_activation='ReLU', attention='add', output_activation='Softmax', dropout=False, dropout_rate=0.2,
+                atten_activation='ReLU', attention='add', output_activation='Softmax',
+                dropout=False, dropout_rate=0.2,
+                l2_regularization=False, l2_weight=1e-4,
                 batch_norm=False, pool=True, unpool=True,
                 backbone=None, weights='imagenet', freeze_backbone=True, freeze_batch_norm=True, name='attunet'):
     '''
@@ -268,6 +283,7 @@ def att_unet_2d(input_size, filter_num, n_labels, stack_num_down=2, stack_num_up
     X = att_unet_2d_base(IN, filter_num, stack_num_down=stack_num_down, stack_num_up=stack_num_up,
                          activation=activation, atten_activation=atten_activation, attention=attention,
                          dropout=dropout, dropout_rate=dropout_rate,
+                         l2_regularization=l2_regularization, l2_weight=l2_weight,
                          batch_norm=batch_norm, pool=pool, unpool=unpool, 
                          backbone=backbone, weights=weights, freeze_backbone=freeze_backbone, 
                          freeze_batch_norm=freeze_backbone, name=name)

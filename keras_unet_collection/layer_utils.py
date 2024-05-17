@@ -8,6 +8,7 @@ from keras.layers import MaxPooling2D, AveragePooling2D, UpSampling2D, Conv2DTra
 from keras.layers import Conv2D, DepthwiseConv2D, Lambda
 from keras.layers import BatchNormalization, Activation, concatenate, multiply, add
 from keras.layers import Dropout
+from keras import regularizers
 from keras.layers import ReLU, LeakyReLU, PReLU, ELU, Softmax
 
 def decode_layer(X, channel, pool_size, unpool, kernel_size=3, 
@@ -197,8 +198,10 @@ def attention_gate(X, g, channel,
 
 def CONV_stack(X, channel, kernel_size=3, stack_num=2, 
                dilation_rate=1, activation='ReLU', 
-               batch_norm=False, dropout=False,
-               dropout_rate=0.2, name='conv_stack'):
+               batch_norm=False,
+               dropout=False, dropout_rate=0.2,
+               l2_regularization=False, l2_weight=1e-4,
+               name='conv_stack'):
     '''
     Stacked convolutional layers:
     (Convolutional layer --> batch normalization --> Activation)*stack_num
@@ -232,8 +235,13 @@ def CONV_stack(X, channel, kernel_size=3, stack_num=2,
         activation_func = eval(activation)
         
         # linear convolution
-        X = Conv2D(channel, kernel_size, padding='same', use_bias=bias_flag, 
-                   dilation_rate=dilation_rate, name='{}_{}'.format(name, i))(X)
+        if l2_regularization:
+            X = Conv2D(channel, kernel_size, padding='same', use_bias=bias_flag,
+                    dilation_rate=dilation_rate, kernel_regularizer=regularizers.L2(l2_weight),
+            name='{}_{}'.format(name, i))(X)
+        else:
+            X = Conv2D(channel, kernel_size, padding='same', use_bias=bias_flag,
+                       dilation_rate=dilation_rate, name='{}_{}'.format(name, i))(X)
         
         # batch normalization
         if batch_norm:
