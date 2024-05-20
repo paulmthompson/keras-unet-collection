@@ -194,7 +194,10 @@ def att_unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
 
         X = UNET_att_right(X, X_decode[i], f, att_channel=f//2, stack_num=stack_num_up,
                            activation=activation, atten_activation=atten_activation, attention=attention,
-                           unpool=unpool, batch_norm=batch_norm, name='{}_up{}'.format(name, i))
+                           unpool=unpool,
+                           dropout_rate=dropout_rate, dropout=dropout,
+                           l2_regularization=l2_regularization, l2_weight=l2_weight,
+                           batch_norm=batch_norm, name='{}_up{}'.format(name, i))
 
     # if tensors for concatenation is not enough
     # then use upsampling without concatenation 
@@ -289,7 +292,8 @@ def att_unet_2d(input_size, filter_num, n_labels, stack_num_down=2, stack_num_up
                          freeze_batch_norm=freeze_backbone, name=name)
     
     # output layer
-    OUT = CONV_output(X, n_labels, kernel_size=1, activation=output_activation, name='{}_output'.format(name))
+    OUT = CONV_output(X, n_labels, kernel_size=1, activation=output_activation, bias_initializer=foreground_init,
+                      name='{}_output'.format(name))
     
     # functional API model
     model = Model(inputs=[IN,], outputs=[OUT,], name='{}_model'.format(name))

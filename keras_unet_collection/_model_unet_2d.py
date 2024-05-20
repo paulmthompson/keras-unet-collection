@@ -1,6 +1,8 @@
 
 from __future__ import absolute_import
 
+import numpy as np
+import tensorflow as tf
 from keras_unet_collection.layer_utils import *
 from keras_unet_collection.activations import GELU, Snake
 from keras_unet_collection._backbone_zoo import backbone_zoo, bach_norm_checker
@@ -188,15 +190,21 @@ def unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
         # handling VGG16 and VGG19 separately
         if 'VGG' in backbone:
             backbone_ = backbone_zoo(backbone, weights, input_tensor, depth_, freeze_backbone, freeze_batch_norm)
+
             # collecting backbone feature maps
-            X_skip = backbone_([input_tensor,])
+            if freeze_backbone:
+                X_skip = backbone_([input_tensor,], training=False)
+
             depth_encode = len(X_skip)
             
         # for other backbones
         else:
             backbone_ = backbone_zoo(backbone, weights, input_tensor, depth_-1, freeze_backbone, freeze_batch_norm)
+
             # collecting backbone feature maps
-            X_skip = backbone_([input_tensor,])
+            if freeze_backbone:
+                X_skip = backbone_([input_tensor,], training=False)
+
             depth_encode = len(X_skip) + 1
 
 
@@ -323,9 +331,14 @@ def unet_2d(input_size, filter_num, n_labels, stack_num_down=2, stack_num_up=2,
                      freeze_batch_norm=freeze_backbone, name=name)
     
     # output layer
-    OUT = CONV_output(X, n_labels, kernel_size=1, activation=output_activation, name='{}_output'.format(name))
+    OUT = CONV_output(X, n_labels, kernel_size=1,
+                      activation=output_activation,
+                      name='{}_output'.format(name)
+                      )
     
     # functional API model
     model = Model(inputs=[IN,], outputs=[OUT,], name='{}_model'.format(name))
     
     return model
+
+
