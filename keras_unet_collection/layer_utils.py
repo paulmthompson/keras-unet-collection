@@ -3,6 +3,8 @@ from __future__ import absolute_import
 
 from keras_unet_collection.activations import GELU, Snake
 from tensorflow import expand_dims
+import tensorflow as tf
+import numpy as np
 from tensorflow.compat.v1 import image
 from keras.layers import MaxPooling2D, AveragePooling2D, UpSampling2D, Conv2DTranspose, GlobalAveragePooling2D
 from keras.layers import Conv2D, DepthwiseConv2D, Lambda
@@ -397,7 +399,7 @@ def ASPP_conv(X, channel, activation='ReLU', batch_norm=True, name='aspp'):
     
     return concatenate([b4, b0, b_r6, b_r9, b_r12])
 
-def CONV_output(X, n_labels, kernel_size=1, activation='Softmax', name='conv_output'):
+def CONV_output(X, n_labels, kernel_size=1, activation='Softmax', name='conv_output',bias_initializer=None):
     '''
     Convolutional layer with output activation.
     
@@ -418,8 +420,10 @@ def CONV_output(X, n_labels, kernel_size=1, activation='Softmax', name='conv_out
         X: output tensor.
         
     '''
-    
-    X = Conv2D(n_labels, kernel_size, padding='same', use_bias=True, name=name)(X)
+
+
+    X = Conv2D(n_labels, kernel_size, padding='same', use_bias=True,
+                   bias_initializer=bias_initializer, name=name)(X)
     
     if activation:
         
@@ -432,3 +436,14 @@ def CONV_output(X, n_labels, kernel_size=1, activation='Softmax', name='conv_out
             
     return X
 
+
+def foreground_init(shape, dtype=None):
+    x = -5 * np.ones(shape, dtype)
+    x[-1] = 1.0
+    x = tf.convert_to_tensor(x)
+    return x
+
+def all_zero_init(shape, dtype=None):
+    x = -5 * np.ones(shape, dtype)
+    x = tf.convert_to_tensor(x)
+    return x
