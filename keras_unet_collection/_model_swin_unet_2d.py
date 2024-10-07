@@ -89,7 +89,7 @@ def swin_unet_2d_base(input_tensor, filter_num_begin, depth, stack_num_down, sta
     
     '''
     # Compute number be patches to be embeded
-    input_size = input_tensor.shape.as_list()[1:]
+    input_size = input_tensor.shape[1:]
     num_patch_x = input_size[0]//patch_size[0]
     num_patch_y = input_size[1]//patch_size[1]
     

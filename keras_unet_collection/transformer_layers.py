@@ -2,10 +2,22 @@
 from __future__ import absolute_import
 
 import numpy as np
+
 import tensorflow as tf
 from tensorflow.nn import depth_to_space
-from tensorflow.image import extract_patches
-from keras.layers import Conv2D, Layer, Dense, Embedding, Dropout, Conv2D, LayerNormalization
+
+import keras
+
+from keras.ops.image import extract_patches
+
+from keras import initializers
+from keras.layers import Conv2D
+from keras.layers import Layer
+from keras.layers import Dense
+from keras.layers import Embedding
+from keras.layers import Dropout
+from keras.layers import Conv2D
+from keras.layers import LayerNormalization
 from keras.activations import softmax
 
 class patch_extract(Layer):
@@ -44,10 +56,10 @@ class patch_extract(Layer):
         
         batch_size = tf.shape(images)[0]
         
-        patches = extract_patches(images=images,
-                                  sizes=(1, self.patch_size_x, self.patch_size_y, 1),
-                                  strides=(1, self.patch_size_x, self.patch_size_y, 1),
-                                  rates=(1, 1, 1, 1), padding='VALID',)
+        patches = extract_patches(images,
+                                  (self.patch_size_x, self.patch_size_y),
+                                  dilation_rate=1, 
+                                  padding='valid',)
         # patches.shape = (num_sample, patch_num, patch_num, patch_size*channel)
         
         patch_dim = patches.shape[-1]
@@ -116,7 +128,7 @@ class patch_embedding(Layer):
         embed = self.proj(patch) + self.pos_embed(pos)
         return embed
 
-class patch_merging(tf.keras.layers.Layer):
+class patch_merging(Layer):
     '''
     Downsample embedded patches; it halfs the number of patches
     and double the embedded dimensions (c.f. pooling layers).
@@ -179,7 +191,7 @@ class patch_merging(tf.keras.layers.Layer):
 
         return x
 
-class patch_expanding(tf.keras.layers.Layer):
+class patch_expanding(Layer):
     '''
     Upsample embedded patches with a given rate (e.g., x2, x4, x8, ...) 
     the number of patches is increased, and the embedded dimensions are reduced.
@@ -314,7 +326,7 @@ class drop_path(Layer):
     def call(self, x, training=None):
         return drop_path_(x, self.drop_prob, training)
 
-class Mlp(tf.keras.layers.Layer):
+class Mlp(Layer):
     def __init__(self, filter_num, drop=0., name='mlp', **kwargs):
         
         super(Mlp, self).__init__(**kwargs)
@@ -330,7 +342,7 @@ class Mlp(tf.keras.layers.Layer):
         self.drop = Dropout(drop)
         
         # GELU activation
-        self.activation = tf.keras.activations.gelu
+        self.activation = keras.activations.gelu
         
     def get_config(self):
         config = super().get_config().copy()
@@ -356,7 +368,7 @@ class Mlp(tf.keras.layers.Layer):
         
         return x
 
-class WindowAttention(tf.keras.layers.Layer):
+class WindowAttention(Layer):
     def __init__(self, dim, window_size, num_heads, qkv_bias=True, qk_scale=None, 
                  attn_drop=0, proj_drop=0., name='swin_atten', **kwargs):
         super(WindowAttention, self).__init__(**kwargs)
@@ -402,9 +414,13 @@ class WindowAttention(tf.keras.layers.Layer):
         
         # zero initialization
         num_window_elements = (2*self.window_size[0] - 1) * (2*self.window_size[1] - 1)
-        self.relative_position_bias_table = self.add_weight('{}_attn_pos'.format(self.prefix),
-                                                            shape=(num_window_elements, self.num_heads),
-                                                            initializer=tf.initializers.Zeros(), trainable=True)
+        self.relative_position_bias_table = self.add_weight(
+             shape=(num_window_elements, self.num_heads),
+             initializer=initializers.Zeros(), 
+             trainable=True,
+             name='{}_attn_pos'.format(self.prefix)
+             )
+        
         
         # Indices of relative positions
         coords_h = np.arange(self.window_size[0])
@@ -419,9 +435,11 @@ class WindowAttention(tf.keras.layers.Layer):
         relative_coords[:, :, 0] *= 2 * self.window_size[1] - 1
         relative_position_index = relative_coords.sum(-1)
         
-        # convert to the tf variable
-        self.relative_position_index = tf.Variable(
-            initial_value=tf.convert_to_tensor(relative_position_index), trainable=False, name='{}_attn_pos_ind'.format(self.prefix))
+        self.relative_position_index = self.add_weight(
+            shape=relative_position_index.shape,
+            initializer=initializers.Constant(relative_position_index),
+            trainable=False, 
+            name='{}_attn_pos_ind'.format(self.prefix))
         
         self.built = True
 
@@ -445,14 +463,15 @@ class WindowAttention(tf.keras.layers.Layer):
         
         # Shift window
         num_window_elements = self.window_size[0] * self.window_size[1]
-        relative_position_index_flat = tf.reshape(self.relative_position_index, shape=(-1,))
+        relative_position_index_flat = tf.reshape(self.relative_position_index, shape=(-1,)) #convert to int
+        relative_position_index_flat = tf.cast(relative_position_index_flat, tf.int32)
         relative_position_bias = tf.gather(self.relative_position_bias_table, relative_position_index_flat)
         relative_position_bias = tf.reshape(relative_position_bias, shape=(num_window_elements, num_window_elements, -1))
         relative_position_bias = tf.transpose(relative_position_bias, perm=(2, 0, 1))
         attn = attn + tf.expand_dims(relative_position_bias, axis=0)
 
         if mask is not None:
-            nW = mask.get_shape()[0]
+            nW = mask.shape[0]
             mask_float = tf.cast(tf.expand_dims(tf.expand_dims(mask, axis=1), axis=0), tf.float32)
             attn = tf.reshape(attn, shape=(-1, nW, self.num_heads, N, N)) + mask_float
             attn = tf.reshape(attn, shape=(-1, self.num_heads, N, N))
@@ -476,7 +495,7 @@ class WindowAttention(tf.keras.layers.Layer):
         
         return x_qkv
 
-class SwinTransformerBlock(tf.keras.layers.Layer):
+class SwinTransformerBlock(Layer):
     def __init__(self, dim, num_patch, num_heads, window_size=7, shift_size=0, 
                  num_mlp=1024, qkv_bias=True, qk_scale=None, mlp_drop=0, attn_drop=0, 
                  proj_drop=0, drop_path_prob=0, name='swin_block', **kwargs):
@@ -562,11 +581,18 @@ class SwinTransformerBlock(tf.keras.layers.Layer):
             attn_mask = tf.expand_dims(mask_windows, axis=1) - tf.expand_dims(mask_windows, axis=2)
             attn_mask = tf.where(attn_mask != 0, -100.0, attn_mask)
             attn_mask = tf.where(attn_mask == 0, 0.0, attn_mask)
-            self.attn_mask = tf.Variable(initial_value=attn_mask, trainable=False, name='{}_attn_mask'.format(self.prefix))
+            self.attn_mask = self.add_weight(
+                shape=attn_mask.shape,
+                initializer=initializers.Constant(attn_mask),
+                trainable=False, 
+                name='{}_attn_mask'.format(self.prefix))
         else:
             self.attn_mask = None
 
         self.built = True
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
 
     def call(self, x):
         H, W = self.num_patch
