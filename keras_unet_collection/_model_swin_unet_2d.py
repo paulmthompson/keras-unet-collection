@@ -2,7 +2,11 @@
 from __future__ import absolute_import
 
 from keras_unet_collection.layer_utils import *
-from keras_unet_collection.transformer_layers import patch_extract, patch_embedding, SwinTransformerBlock, patch_merging, patch_expanding
+from keras_unet_collection.transformer_layers import patch_extract
+from keras_unet_collection.transformer_layers import patch_embedding
+from keras_unet_collection.transformer_layers import SwinTransformerBlock
+from keras_unet_collection.transformer_layers import patch_merging
+from keras_unet_collection.transformer_layers import patch_expanding
 
 from keras.layers import Input, Dense
 from keras.models import Model
@@ -231,7 +235,10 @@ def swin_unet_2d(input_size, filter_num_begin, n_labels, depth, stack_num_down, 
                           patch_size=patch_size, num_heads=num_heads, window_size=window_size, num_mlp=num_mlp, shift_window=shift_window, name=name)
     
     # output layer
-    OUT = CONV_output(X, n_labels, kernel_size=1, activation=output_activation, name='{}_output'.format(name))
+    OUT = CONV_output(X, n_labels, kernel_size=1, 
+                      activation=output_activation,
+                      bias_initializer=all_zero_init, 
+                      name='{}_output'.format(name))
     
     # functional API model
     model = Model(inputs=[IN,], outputs=[OUT,], name='{}_model'.format(name))
