@@ -442,3 +442,8 @@ def foreground_init(shape, dtype=None):
     x[-1] = 1.0
     x = tf.convert_to_tensor(x)
     return x
+
+def all_zero_init(shape, dtype=None):
+    x = -5 * np.ones(shape, dtype)
+    x = tf.convert_to_tensor(x)
+    return x

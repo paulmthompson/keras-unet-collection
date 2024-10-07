@@ -292,7 +292,7 @@ def att_unet_2d(input_size, filter_num, n_labels, stack_num_down=2, stack_num_up
                          freeze_batch_norm=freeze_backbone, name=name)
     
     # output layer
-    OUT = CONV_output(X, n_labels, kernel_size=1, activation=output_activation, bias_initializer=foreground_init,
+    OUT = CONV_output(X, n_labels, kernel_size=1, activation=output_activation, bias_initializer=all_zero_init,
                       name='{}_output'.format(name))
     
     # functional API model
