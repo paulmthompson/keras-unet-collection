@@ -116,14 +116,15 @@ def cbam_block(base_out, ratio=1):
 
     # Neck
     can_module   = ChannelAttentionModule()
-    san_module_x = SpatialAttentionModule()
-    san_module_y = SpatialAttentionModule()
+    san_module = StripPooling()
+    #san_module_x = SpatialAttentionModule()
+    #san_module_y = SpatialAttentionModule()
     awn_module   = AttentionWeightedAverage2D()
     
     # Attention Modules 1
     # Channel Attention + Spatial Attention 
     canx   = can_module(base_out)*base_out
-    spnx   = san_module_x(canx)*canx
+    spnx   = san_module(canx)
     #spny   = san_module_y(canx)
 
     # Global Weighted Average Pooling
@@ -138,3 +139,51 @@ def cbam_block(base_out, ratio=1):
     #attns_adds = keras.layers.Add()([gapavg, awgavg])
 
     return spnx
+
+
+#https://openaccess.thecvf.com/content_CVPR_2020/papers/Hou_Strip_Pooling_Rethinking_Spatial_Pooling_for_Scene_Parsing_CVPR_2020_paper.pdf
+class StripPooling(keras.layers.Layer):
+    def __init(self, **kwargs):
+        super(StripPooling, self).__init__(**kwargs)
+    
+    def build(self, input_shape):
+        self.expand_vertical = keras.layers.Conv2D(
+            input_shape[-1], 
+            (1, 1), 
+            use_bias=False, 
+            kernel_initializer='he_normal'
+            )
+        self.expand_horizontal = keras.layers.Conv2D(
+            input_shape[-1], 
+            (1, 1), 
+            use_bias=False, 
+            kernel_initializer='he_normal'
+            )
+        self.fuse = keras.layers.Add()
+        self.conv1x1 = keras.layers.Conv2D(
+            input_shape[-1], (1, 1), 
+            use_bias=False, 
+            kernel_initializer='he_normal'
+            )
+        self.sigmoid = keras.layers.Activation('sigmoid')
+    
+    def call(self, inputs):
+
+        # Vertical pooling
+        pooled_vertical = keras.ops.mean(inputs, axis=2, keepdims=True)  # Shape: (batch_size, H, 1, channels)
+        pooled_vertical = self.expand_vertical(pooled_vertical)
+
+        # Horizontal pooling
+        pooled_horizontal = keras.ops.mean(inputs, axis=1, keepdims=True)  # Shape: (batch_size, 1, W, channels)
+        pooled_horizontal = self.expand_horizontal(pooled_horizontal)
+
+        # Fuse the pooled tensors
+        fused = self.fuse([pooled_vertical, pooled_horizontal])
+
+        fused = self.conv1x1(fused)
+        fused = self.sigmoid(fused)
+
+        # Multiply with the original input
+        output = inputs * fused
+
+        return output
