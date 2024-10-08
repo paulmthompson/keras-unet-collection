@@ -6,6 +6,8 @@ from keras_unet_collection.activations import GELU, Snake
 from keras_unet_collection._model_unet_2d import UNET_left, UNET_right
 from keras_unet_collection._backbone_zoo import backbone_zoo, bach_norm_checker
 
+from keras_unet_collection.cbam import cbam_block
+
 from keras.layers import Input
 from keras.models import Model
 
@@ -51,6 +53,9 @@ def UNET_att_right(X, X_left, channel, att_channel, kernel_size=3, stack_num=2,
     X = decode_layer(X, channel, pool_size, unpool, 
                      activation=activation, batch_norm=batch_norm, name='{}_decode'.format(name))
     
+    # Here we can run X_left through CAM and SA blocks
+    X_left = cbam_block(X_left, ratio=1)
+
     X_left = attention_gate(X=X_left, g=X, channel=att_channel, activation=atten_activation, 
                             attention=attention, name='{}_att'.format(name))
     
