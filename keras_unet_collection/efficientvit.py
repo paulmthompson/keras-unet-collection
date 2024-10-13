@@ -25,7 +25,8 @@ This is a keras implementation of EfficientViT.
 The original pytorch implementation can be found here:
 https://github.com/mit-han-lab/efficientvit
 
-This was modified October 2024 by Paul Thompson
+This was modified October 2024 by Paul Thompson,
+mostly to make it Keras3 compatible.
 
 """
 

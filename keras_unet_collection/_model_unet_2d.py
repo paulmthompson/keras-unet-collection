@@ -5,7 +5,9 @@ import numpy as np
 import tensorflow as tf
 from keras_unet_collection.layer_utils import *
 from keras_unet_collection.activations import GELU, Snake
-from keras_unet_collection._backbone_zoo import backbone_zoo, bach_norm_checker
+from keras_unet_collection._backbone_zoo import backbone_zoo
+from keras_unet_collection._backbone_zoo import bach_norm_checker
+from keras_unet_collection.efficientvit import EfficientViT_B
 
 from keras.layers import Input
 from keras.models import Model
@@ -198,6 +200,17 @@ def unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
             depth_encode = len(X_skip)
             
         # for other backbones
+        elif 'EfficientVit' in backbone:
+
+            backbone_ = EfficientViT_B(
+                input_shape=(input_tensor.shape[1], input_tensor.shape[2], input_tensor.shape[3]),
+                unet_output=True,
+            )
+
+            X_skip = backbone_(input_tensor)
+
+            depth_encode = len(X_skip) + 1
+        
         else:
             backbone_ = backbone_zoo(backbone, weights, input_tensor, depth_-1, freeze_backbone, freeze_batch_norm)
 
