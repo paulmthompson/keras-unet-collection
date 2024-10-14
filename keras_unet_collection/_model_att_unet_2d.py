@@ -5,6 +5,7 @@ from keras_unet_collection.layer_utils import *
 from keras_unet_collection.activations import GELU, Snake
 from keras_unet_collection._model_unet_2d import UNET_left, UNET_right
 from keras_unet_collection._backbone_zoo import backbone_zoo, bach_norm_checker
+from keras_unet_collection.efficientvit import EfficientViT_B
 
 from keras_unet_collection.cbam import cbam_block
 
@@ -156,6 +157,29 @@ def att_unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
             backbone_ = backbone_zoo(backbone, weights, input_tensor, depth_, freeze_backbone, freeze_batch_norm)
             # collecting backbone feature maps
             X_skip = backbone_([input_tensor,])
+            depth_encode = len(X_skip)
+
+        elif 'EfficientVit' in backbone:
+
+            backbone_ = EfficientViT_B(
+                input_shape=(input_tensor.shape[1], input_tensor.shape[2], input_tensor.shape[3]),
+                activation="keras.activations.hard_silu",
+                num_blocks=[2,2,2,2],
+                expansions=4,
+                unet_output=True,
+            )
+
+            X_skip = backbone_(input_tensor)
+
+            X_skip.pop(-2)
+            X_skip.pop(1)
+
+            X_skip.insert(0, input_tensor)
+
+            #Remove X_skip so that len(X_skip) equals depth_
+            X_skip = X_skip[:depth_]
+
+            print(X_skip)
             depth_encode = len(X_skip)
 
         # for other backbones

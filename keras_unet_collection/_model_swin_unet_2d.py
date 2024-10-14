@@ -19,7 +19,7 @@ def swin_transformer_stack(X, stack_num, embed_dim, num_patch, num_heads, window
     *Dropout is turned off.
     '''
     # Turn-off dropouts
-    mlp_drop_rate = 0 # Droupout after each MLP layer
+    mlp_drop_rate = 0 # Dropout after each MLP layer
     attn_drop_rate = 0 # Dropout after Swin-Attention
     proj_drop_rate = 0 # Dropout at the end of each Swin-Attention block, i.e., after linear projections
     drop_path_rate = 0 # Drop-path within skip-connections

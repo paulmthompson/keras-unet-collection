@@ -55,6 +55,8 @@ class patch_extract(Layer):
     def call(self, images):
         
         batch_size = tf.shape(images)[0]
+
+        images = keras.ops.cast(images, dtype="float32")
         
         patches = extract_patches(images,
                                   (self.patch_size_x, self.patch_size_y),
@@ -472,7 +474,9 @@ class WindowAttention(Layer):
 
         if mask is not None:
             nW = mask.shape[0]
-            mask_float = tf.cast(tf.expand_dims(tf.expand_dims(mask, axis=1), axis=0), tf.float32)
+            #Convert mask to float. could be 16 or 32, so match type of attn
+            attn_dtype = attn.dtype
+            mask_float = keras.ops.cast(tf.expand_dims(tf.expand_dims(mask, axis=1), axis=0), dtype=attn_dtype)
             attn = tf.reshape(attn, shape=(-1, nW, self.num_heads, N, N)) + mask_float
             attn = tf.reshape(attn, shape=(-1, self.num_heads, N, N))
             attn = softmax(attn, axis=-1)

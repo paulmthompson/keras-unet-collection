@@ -155,6 +155,10 @@ def EfficientViT_B(
     nn = keras.layers.Conv2D(stem_width, 3, strides=2, padding="same", name="stem_conv")(inputs)
     nn = keras.layers.BatchNormalization(momentum=0.9, name="stem_bn")(nn)
     nn = keras.layers.Activation(activation_func, name="stem_activation_")(nn)
+
+    if unet_output:
+        unet_outputs.append(nn)
+
     nn = mb_conv(nn, stem_width, shortcut=True, expansion=1, is_fused=is_fused[0], activation=activation, name="stem_MB_")
 
     if unet_output:
