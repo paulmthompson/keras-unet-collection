@@ -161,9 +161,6 @@ def EfficientViT_B(
 
     nn = mb_conv(nn, stem_width, shortcut=True, expansion=1, is_fused=is_fused[0], activation=activation, name="stem_MB_")
 
-    if unet_output:
-        unet_outputs.append(nn)
-
     """ stage [1, 2, 3, 4] """
     total_blocks = sum(num_blocks)
     global_block_id = 0
@@ -199,6 +196,8 @@ def EfficientViT_B(
         nn = keras.layers.Activation(activation_func, name="features_activation")(nn)
 
     if unet_output:
+        #remove last
+        unet_outputs.pop()
         unet_outputs.append(nn)
         nn = unet_outputs
 
