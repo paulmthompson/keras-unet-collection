@@ -8,13 +8,21 @@ import numpy as np
 from tensorflow.compat.v1 import image
 from keras.layers import MaxPooling2D, AveragePooling2D, UpSampling2D, Conv2DTranspose, GlobalAveragePooling2D
 from keras.layers import Conv2D, DepthwiseConv2D, Lambda
-from keras.layers import BatchNormalization, Activation, concatenate, multiply, add
+from keras.layers import BatchNormalization, GroupNormalization, Activation, concatenate, multiply, add
 from keras.layers import Dropout, SpatialDropout2D
 from keras import regularizers
 from keras.layers import ReLU, LeakyReLU, PReLU, ELU, Softmax
 
-def decode_layer(X, channel, pool_size, unpool, kernel_size=3, 
-                 activation='ReLU', batch_norm=False, name='decode'):
+def decode_layer(
+        X,
+        channel,
+        pool_size,
+        unpool,
+        kernel_size=3,
+        activation='ReLU',
+        batch_norm=False,
+        group_norm=False,
+        name='decode'):
     '''
     An overall decode layer, based on either upsampling or trans conv.
     
@@ -71,7 +79,10 @@ def decode_layer(X, channel, pool_size, unpool, kernel_size=3,
         
         # batch normalization
         if batch_norm:
-            X = BatchNormalization(axis=3, name='{}_bn'.format(name))(X)
+            X = BatchNormalization(momentum=0.9, axis=3, name='{}_bn'.format(name))(X)
+        
+        if group_norm:
+            X = GroupNormalization(groups=32, axis=3, name='{}_gn'.format(name))(X)
             
         # activation
         if activation is not None:
@@ -80,8 +91,16 @@ def decode_layer(X, channel, pool_size, unpool, kernel_size=3,
         
     return X
 
-def encode_layer(X, channel, pool_size, pool, kernel_size='auto', 
-                 activation='ReLU', batch_norm=False, name='encode'):
+def encode_layer(
+        X,
+        channel,
+        pool_size,
+        pool,
+        kernel_size='auto',
+        activation='ReLU',
+        batch_norm=False,
+        group_norm=False,
+        name='encode'):
     '''
     An overall encode layer, based on one of the:
     (1) max-pooling, (2) average-pooling, (3) strided conv2d.
@@ -136,7 +155,10 @@ def encode_layer(X, channel, pool_size, pool, kernel_size='auto',
         
         # batch normalization
         if batch_norm:
-            X = BatchNormalization(axis=3, name='{}_bn'.format(name))(X)
+            X = BatchNormalization(momentum=0.9, axis=3, name='{}_bn'.format(name))(X)
+
+        if group_norm:
+            X = GroupNormalization(groups=32, axis=3, name='{}_gn'.format(name))(X)
             
         # activation
         if activation is not None:
@@ -198,12 +220,20 @@ def attention_gate(X, g, channel,
     
     return X_att
 
-def CONV_stack(X, channel, kernel_size=3, stack_num=2, 
-               dilation_rate=1, activation='ReLU', 
-               batch_norm=False,
-               dropout=False, dropout_rate=0.2,
-               l2_regularization=False, l2_weight=1e-4,
-               name='conv_stack'):
+def CONV_stack(
+        X,
+        channel,
+        kernel_size=3,
+        stack_num=2,
+        dilation_rate=1,
+        activation='ReLU',
+        batch_norm=False,
+        group_norm=False,
+        dropout=False,
+        dropout_rate=0.2,
+        l2_regularization=False,
+        l2_weight=1e-4,
+        name='conv_stack'):
     '''
     Stacked convolutional layers:
     (Convolutional layer --> batch normalization --> Activation)*stack_num
@@ -247,7 +277,10 @@ def CONV_stack(X, channel, kernel_size=3, stack_num=2,
         
         # batch normalization
         if batch_norm:
-            X = BatchNormalization(axis=3, name='{}_{}_bn'.format(name, i))(X)
+            X = BatchNormalization(momentum=0.9, axis=3, name='{}_{}_bn'.format(name, i))(X)
+
+        if group_norm:
+            X = GroupNormalization(groups=32, axis=3, name='{}_{}_gn'.format(name, i))(X)
         
         # activation
         activation_func = eval(activation)
@@ -261,7 +294,15 @@ def CONV_stack(X, channel, kernel_size=3, stack_num=2,
         
     return X
 
-def Res_CONV_stack(X, X_skip, channel, res_num, activation='ReLU', batch_norm=False, name='res_conv'):
+def Res_CONV_stack(
+        X,
+        X_skip,
+        channel,
+        res_num,
+        activation='ReLU',
+        batch_norm=False,
+        group_norm=False,
+        name='res_conv'):
     '''
     Stacked convolutional layers with residual path.
      
@@ -284,7 +325,7 @@ def Res_CONV_stack(X, X_skip, channel, res_num, activation='ReLU', batch_norm=Fa
         
     '''  
     X = CONV_stack(X, channel, kernel_size=3, stack_num=res_num, dilation_rate=1, 
-                   activation=activation, batch_norm=batch_norm, name=name)
+                   activation=activation, batch_norm=batch_norm, group_norm=group_norm, name=name)
 
     X = add([X_skip, X], name='{}_add'.format(name))
     
@@ -293,7 +334,15 @@ def Res_CONV_stack(X, X_skip, channel, res_num, activation='ReLU', batch_norm=Fa
     
     return X
 
-def Sep_CONV_stack(X, channel, kernel_size=3, stack_num=1, dilation_rate=1, activation='ReLU', batch_norm=False, name='sep_conv'):
+def Sep_CONV_stack(
+        X, channel,
+        kernel_size=3,
+        stack_num=1,
+        dilation_rate=1,
+        activation='ReLU',
+        batch_norm=False,
+        group_norm=False,
+        name='sep_conv'):
     '''
     Depthwise separable convolution with (optional) dilated convolution kernel and batch normalization.
     
@@ -324,14 +373,17 @@ def Sep_CONV_stack(X, channel, kernel_size=3, stack_num=1, dilation_rate=1, acti
                             use_bias=bias_flag, name='{}_{}_depthwise'.format(name, i))(X)
         
         if batch_norm:
-            X = BatchNormalization(name='{}_{}_depthwise_BN'.format(name, i))(X)
+            X = BatchNormalization(momentum=0.9, name='{}_{}_depthwise_BN'.format(name, i))(X)
+        
+        if group_norm:
+            X = GroupNormalization(groups=32, axis=3, name='{}_{}_gn'.format(name, i))(X)
 
         X = activation_func(name='{}_{}_depthwise_activation'.format(name, i))(X)
 
         X = Conv2D(channel, (1, 1), padding='same', use_bias=bias_flag, name='{}_{}_pointwise'.format(name, i))(X)
         
         if batch_norm:
-            X = BatchNormalization(name='{}_{}_pointwise_BN'.format(name, i))(X)
+            X = BatchNormalization(momentum=0.9, name='{}_{}_pointwise_BN'.format(name, i))(X)
 
         X = activation_func(name='{}_{}_pointwise_activation'.format(name, i))(X)
     
@@ -374,7 +426,7 @@ def ASPP_conv(X, channel, activation='ReLU', batch_norm=True, name='aspp'):
     b4 = Conv2D(channel, 1, padding='same', use_bias=bias_flag, name='{}_conv_b4'.format(name))(b4)
     
     if batch_norm:
-        b4 = BatchNormalization(name='{}_conv_b4_BN'.format(name))(b4)
+        b4 = BatchNormalization(momentum=0.9, name='{}_conv_b4_BN'.format(name))(b4)
         
     b4 = activation_func(name='{}_conv_b4_activation'.format(name))(b4)
     
@@ -385,7 +437,7 @@ def ASPP_conv(X, channel, activation='ReLU', batch_norm=True, name='aspp'):
     b0 = Conv2D(channel, (1, 1), padding='same', use_bias=bias_flag, name='{}_conv_b0'.format(name))(X)
 
     if batch_norm:
-        b0 = BatchNormalization(name='{}_conv_b0_BN'.format(name))(b0)
+        b0 = BatchNormalization(momentum=0.9, name='{}_conv_b0_BN'.format(name))(b0)
         
     b0 = activation_func(name='{}_conv_b0_activation'.format(name))(b0)
     

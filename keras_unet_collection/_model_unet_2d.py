@@ -12,11 +12,20 @@ from keras_unet_collection.efficientvit import EfficientViT_B
 from keras.layers import Input
 from keras.models import Model
 
-def UNET_left(X, channel, kernel_size=3, stack_num=2,
-              dropout_rate=0.2, dropout=False,
-              l2_regularization=False, l2_weight=1e-4,
-              activation='ReLU',
-              pool=True, batch_norm=False, name='left0'):
+def UNET_left(
+        X,
+        channel,
+        kernel_size=3,
+        stack_num=2,
+        dropout_rate=0.2,
+        dropout=False,
+        l2_regularization=False,
+        l2_weight=1e-4,
+        activation='ReLU',
+        pool=True,
+        batch_norm=False,
+        group_norm=False,
+        name='left0'):
     '''
     The encoder block of U-net.
     
@@ -44,21 +53,32 @@ def UNET_left(X, channel, kernel_size=3, stack_num=2,
     pool_size = 2
     
     X = encode_layer(X, channel, pool_size, pool, activation=activation, 
-                     batch_norm=batch_norm, name='{}_encode'.format(name))
+                     batch_norm=batch_norm, group_norm=group_norm, name='{}_encode'.format(name))
 
     X = CONV_stack(X, channel, kernel_size, stack_num=stack_num, activation=activation,
                    dropout_rate=dropout_rate, dropout=dropout,
                    l2_regularization=l2_regularization, l2_weight=l2_weight,
-                   batch_norm=batch_norm, name='{}_conv'.format(name))
+                   batch_norm=batch_norm, group_norm=group_norm, name='{}_conv'.format(name))
     
     return X
 
 
-def UNET_right(X, X_list, channel, kernel_size=3, 
-               stack_num=2, activation='ReLU',
-               dropout_rate=0.2, dropout=False,
-               l2_regularization=False, l2_weight=1e-4,
-               unpool=True, batch_norm=False, concat=True, name='right0'):
+def UNET_right(
+        X,
+        X_list,
+        channel,
+        kernel_size=3, 
+        stack_num=2,
+        activation='ReLU',
+        dropout_rate=0.2,
+        dropout=False,
+        l2_regularization=False,
+        l2_weight=1e-4,
+        unpool=True,
+        batch_norm=False,
+        group_norm=False,
+        concat=True,
+        name='right0'):
     
     '''
     The decoder block of U-net.
@@ -87,13 +107,14 @@ def UNET_right(X, X_list, channel, kernel_size=3,
     pool_size = 2
     
     X = decode_layer(X, channel, pool_size, unpool, 
-                     activation=activation, batch_norm=batch_norm, name='{}_decode'.format(name))
+                     activation=activation, batch_norm=batch_norm, 
+                     group_norm=group_norm, name='{}_decode'.format(name))
     
     # linear convolutional layers before concatenation
     X = CONV_stack(X, channel, kernel_size, stack_num=1, activation=activation,
                    dropout_rate=dropout_rate, dropout=dropout,
                    l2_regularization=l2_regularization, l2_weight=l2_weight,
-                   batch_norm=batch_norm, name='{}_conv_before_concat'.format(name))
+                   batch_norm=batch_norm, group_norm=group_norm, name='{}_conv_before_concat'.format(name))
     if concat:
         # <--- *stacked convolutional can be applied here
         X = concatenate([X,]+X_list, axis=3, name=name+'_concat')
@@ -102,12 +123,12 @@ def UNET_right(X, X_list, channel, kernel_size=3,
     X = CONV_stack(X, channel, kernel_size, stack_num=stack_num, activation=activation,
                    dropout_rate=dropout_rate, dropout=dropout,
                    l2_regularization=l2_regularization, l2_weight=l2_weight,
-                   batch_norm=batch_norm, name=name+'_conv_after_concat')
+                   batch_norm=batch_norm, group_norm=group_norm, name=name+'_conv_after_concat')
     
     return X
 
 def unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2, 
-                 activation='ReLU', batch_norm=False, pool=True, unpool=True,
+                 activation='ReLU', batch_norm=False, group_norm=False, pool=True, unpool=True,
                  dropout_rate=0.2, dropout=False,
                  l2_regularization=False, l2_weight=1e-4,
                  backbone=None, weights='imagenet', freeze_backbone=True, freeze_batch_norm=True, name='unet'):
@@ -175,7 +196,7 @@ def unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
         X = CONV_stack(X, filter_num[0], stack_num=stack_num_down, activation=activation,
                        dropout_rate=dropout_rate, dropout=dropout,
                        l2_regularization=l2_regularization, l2_weight=l2_weight,
-                       batch_norm=batch_norm, name='{}_down0'.format(name))
+                       batch_norm=batch_norm, group_norm=group_norm, name='{}_down0'.format(name))
         X_skip.append(X)
 
         # downsampling blocks
@@ -184,7 +205,7 @@ def unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
                           dropout_rate=dropout_rate, dropout=dropout,
                           l2_regularization=l2_regularization, l2_weight=l2_weight,
                           pool=pool,
-                          batch_norm=batch_norm, name='{}_down{}'.format(name, i+1))        
+                          batch_norm=batch_norm, group_norm=group_norm, name='{}_down{}'.format(name, i+1))        
             X_skip.append(X)
 
     # backbone cases
@@ -236,7 +257,7 @@ def unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
                               dropout_rate=dropout_rate, dropout=dropout,
                               l2_regularization=l2_regularization, l2_weight=l2_weight,
                               pool=pool,
-                              batch_norm=batch_norm, name='{}_down{}'.format(name, i_real+1))
+                              batch_norm=batch_norm, group_norm=group_norm, name='{}_down{}'.format(name, i_real+1))
                 X_skip.append(X)
 
     # reverse indexing encoded feature maps
@@ -256,7 +277,7 @@ def unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
                        dropout_rate=dropout_rate, dropout=dropout,
                        l2_regularization=l2_regularization, l2_weight=l2_weight,
                        activation=activation,
-                       unpool=unpool, batch_norm=batch_norm, name='{}_up{}'.format(name, i))
+                       unpool=unpool, batch_norm=batch_norm, group_norm=group_norm, name='{}_up{}'.format(name, i))
 
     # if tensors for concatenation is not enough
     # then use upsampling without concatenation 
@@ -266,14 +287,15 @@ def unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
             X = UNET_right(X, None, filter_num_decode[i_real], stack_num=stack_num_up, activation=activation, 
                        dropout_rate=dropout_rate, dropout=dropout,
                        l2_regularization=l2_regularization, l2_weight=l2_weight,
-                       unpool=unpool, batch_norm=batch_norm, concat=False, name='{}_up{}'.format(name, i_real))
+                       unpool=unpool, batch_norm=batch_norm, group_norm=group_norm, 
+                       concat=False, name='{}_up{}'.format(name, i_real))
     return X
 
 def unet_2d(input_size, filter_num, n_labels, stack_num_down=2, stack_num_up=2,
             activation='ReLU', output_activation='Softmax',
             dropout_rate=0.2, dropout=False,
             l2_regularization=False, l2_weight=1e-4,
-            batch_norm=False, pool=True, unpool=True,
+            batch_norm=False, group_norm=False, pool=True, unpool=True,
             backbone=None, weights='imagenet', freeze_backbone=True, freeze_batch_norm=True, name='unet'):
     '''
     U-net with an optional ImageNet-trained backbone.
@@ -337,6 +359,7 @@ def unet_2d(input_size, filter_num, n_labels, stack_num_down=2, stack_num_up=2,
     # base    
     X = unet_2d_base(IN, filter_num, stack_num_down=stack_num_down, stack_num_up=stack_num_up, 
                      activation=activation, batch_norm=batch_norm,
+                     group_norm=group_norm,
                      dropout_rate=dropout_rate, dropout=dropout,
                      l2_regularization=l2_regularization, l2_weight=l2_weight,
                      pool=pool, unpool=unpool,

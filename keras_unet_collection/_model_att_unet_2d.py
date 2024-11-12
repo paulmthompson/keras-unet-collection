@@ -13,11 +13,24 @@ from keras.layers import Input
 from keras.models import Model
 
 
-def UNET_att_right(X, X_left, channel, att_channel, kernel_size=3, stack_num=2,
-                   activation='ReLU', atten_activation='ReLU', attention='add',
-                   dropout_rate=0.2, dropout=False,
-                   l2_regularization=False, l2_weight=1e-4,
-                   unpool=True, batch_norm=False, name='right0'):
+def UNET_att_right(
+        X,
+        X_left,
+        channel,
+        att_channel,
+        kernel_size=3,
+        stack_num=2,
+        activation='ReLU',
+        atten_activation='ReLU',
+        attention='add',
+        dropout_rate=0.2,
+        dropout=False,
+        l2_regularization=False,
+        l2_weight=1e-4,
+        unpool=True,
+        batch_norm=False,
+        group_norm=False,
+        name='right0'):
     '''
     the decoder block of Attention U-net.
     
@@ -67,16 +80,30 @@ def UNET_att_right(X, X_left, channel, att_channel, kernel_size=3, stack_num=2,
     H = CONV_stack(H, channel, kernel_size, stack_num=stack_num, activation=activation,
                    dropout_rate=dropout_rate, dropout=dropout,
                    l2_regularization=l2_regularization, l2_weight=l2_weight,
-                   batch_norm=batch_norm, name='{}_conv_after_concat'.format(name))
+                   batch_norm=batch_norm, group_norm=group_norm, name='{}_conv_after_concat'.format(name))
     
     return H
 
-def att_unet_2d_base(input_tensor, filter_num, stack_num_down=2, stack_num_up=2,
-                     activation='ReLU', atten_activation='ReLU', attention='add',
-                     dropout=False, dropout_rate=0.2,
-                     l2_regularization=False, l2_weight=1e-4,
-                     batch_norm=False, pool=True, unpool=True,
-                     backbone=None, weights='imagenet', freeze_backbone=True, freeze_batch_norm=True, name='attunet'):
+def att_unet_2d_base(
+        input_tensor,
+        filter_num,
+        stack_num_down=2,
+        stack_num_up=2,
+        activation='ReLU',
+        atten_activation='ReLU',
+        attention='add',
+        dropout=False,
+        dropout_rate=0.2,
+        l2_regularization=False,
+        l2_weight=1e-4,
+        batch_norm=False,
+        pool=True,
+        unpool=True,
+        backbone=None,
+        weights='imagenet',
+        freeze_backbone=True,
+        freeze_batch_norm=True,
+        name='attunet'):
     '''
     The base of Attention U-net with an optional ImageNet backbone
     
