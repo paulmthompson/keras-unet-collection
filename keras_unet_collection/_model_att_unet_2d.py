@@ -30,6 +30,7 @@ def UNET_att_right(
         unpool=True,
         batch_norm=False,
         group_norm=False,
+        cbam=False,
         name='right0'):
     '''
     the decoder block of Attention U-net.
@@ -68,7 +69,8 @@ def UNET_att_right(
                      activation=activation, batch_norm=batch_norm, name='{}_decode'.format(name))
     
     # Here we can run X_left through CAM and SA blocks
-    X_left = cbam_block(X_left, ratio=1)
+    if cbam:
+        X_left = cbam_block(X_left, ratio=1)
 
     X_left = attention_gate(X=X_left, g=X, channel=att_channel, activation=atten_activation, 
                             attention=attention, name='{}_att'.format(name))
