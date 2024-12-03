@@ -199,8 +199,7 @@ def EfficientViT_B(
     use_norm=True,
     initializer=None,
     model_name="efficientvit",
-    kwargs=None,
-    unet_output=False,
+    kwargs=None
 ):
     
     if initializer is None:
@@ -210,8 +209,6 @@ def EfficientViT_B(
     is_fused = is_fused if isinstance(is_fused, (list, tuple)) else ([is_fused] * len(num_blocks))
 
     activation_func = eval(activation)
-
-    unet_outputs = []
 
     """ stage 0, Stem_stage """
     nn = keras.layers.Conv2D(
@@ -224,9 +221,6 @@ def EfficientViT_B(
     if use_norm:
         nn = keras.layers.BatchNormalization(momentum=0.9, name="stem_bn")(nn)
     nn = keras.layers.Activation(activation_func, name="stem_activation_")(nn)
-
-    if unet_output:
-        unet_outputs.append(nn) # 2x downsample
 
     nn = mb_conv(
         nn,
@@ -308,9 +302,6 @@ def EfficientViT_B(
                     name=name)
             global_block_id += 1
 
-        if unet_output:
-            unet_outputs.append(nn)
-
     output_filters = output_filters if isinstance(output_filters, (list, tuple)) else (output_filters, 0)
     if output_filters[0] > 0:
         nn = keras.layers.Conv2D(
@@ -321,12 +312,6 @@ def EfficientViT_B(
         if use_norm:
             nn = keras.layers.BatchNormalization(momentum=0.9, name="features_bn")(nn)
         nn = keras.layers.Activation(activation_func, name="features_activation")(nn)
-
-    if unet_output:
-        #remove last
-        unet_outputs.pop()
-        unet_outputs.append(nn)
-        nn = unet_outputs
 
     model = keras.models.Model(inputs, nn, name=model_name)
 
