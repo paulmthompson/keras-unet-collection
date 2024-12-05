@@ -101,7 +101,8 @@ def mb_conv(
         kernel_initializer=initializer,
         name=name + "pw_conv")(nn)
     if use_output_norm:
-        nn = keras.layers.BatchNormalization(momentum=0.9, gamma_initializer="zeros", name=name + "pw_bn")(nn)
+        #nn = keras.layers.BatchNormalization(momentum=0.9, gamma_initializer="zeros", name=name + "pw_bn")(nn)
+        nn = keras.layers.BatchNormalization(momentum=0.9, name=name + "pw_bn")(nn)
     nn = keras.layers.Dropout(rate=drop_rate, name=name + "dropout")(nn)
 
     return keras.layers.Add(name=name + "output")([inputs, nn]) if shortcut else keras.layers.Activation("linear", name=name + "output")(nn)
