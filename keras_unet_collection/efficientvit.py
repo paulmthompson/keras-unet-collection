@@ -45,6 +45,7 @@ def mb_conv(
     use_output_norm=False,
     initializer=None,
     drop_rate=0,
+    anti_aliasing=False,
     activation="keras.activations.hard_silu",
     name=""
 ):
@@ -55,12 +56,24 @@ def mb_conv(
 
     input_channel = inputs.shape[-1]
     if is_fused:
-        nn = keras.layers.Conv2D(
-            int(input_channel * expansion),
-            3, strides,
-            padding="same",
-            kernel_initializer=initializer,
-            name=name and name + "expand_conv")(inputs)
+        if anti_aliasing and strides > 1:
+            nn = keras.layers.Conv2D(
+                int(input_channel * expansion),
+                3,
+                strides=1,
+                padding="same",
+                kernel_initializer=initializer,
+                name=name and name + "expand_conv")(inputs)
+            nn = Blur2D(kernel_size=5, stride=strides, padding='same')(nn)
+        else:
+            nn = keras.layers.Conv2D(
+                int(input_channel * expansion),
+                3,
+                strides=strides,
+                padding="same",
+                kernel_initializer=initializer,
+                name=name and name + "expand_conv")(inputs)
+
         if use_norm:
             nn = keras.layers.BatchNormalization(momentum=0.9, name=name + "expand_bn")(nn) 
         nn = keras.layers.Activation(activation_func, name='{}_activation'.format(name))(nn)
@@ -79,13 +92,23 @@ def mb_conv(
         nn = inputs
 
     if not is_fused:
-        nn = keras.layers.DepthwiseConv2D(
-            3,
-            strides=strides,
-            use_bias=True,
-            padding="same",
-            depthwise_initializer=initializer,
-            name=name + "dw_conv")(nn)
+        if anti_aliasing and strides > 1:
+            nn = keras.layers.DepthwiseConv2D(
+                3,
+                strides=1,
+                use_bias=True,
+                padding="same",
+                depthwise_initializer=initializer,
+                name=name + "dw_conv")(nn)
+            nn = Blur2D(kernel_size=3, stride=strides, padding='same')(nn)
+        else:
+            nn = keras.layers.DepthwiseConv2D(
+                3,
+                strides=strides,
+                use_bias=True,
+                padding="same",
+                depthwise_initializer=initializer,
+                name=name + "dw_conv")(nn)
         if use_norm:
             nn = keras.layers.BatchNormalization(momentum=0.9, name=name + "dw_bn")(nn)
         nn = keras.layers.Activation(activation_func, name='{}_dw_activation'.format(name))(nn)
@@ -100,8 +123,11 @@ def mb_conv(
         use_bias=True,
         kernel_initializer=initializer,
         name=name + "pw_conv")(nn)
-    if use_output_norm:
-        #nn = keras.layers.BatchNormalization(momentum=0.9, gamma_initializer="zeros", name=name + "pw_bn")(nn)
+    
+    if use_output_norm and shortcut:
+        nn = keras.layers.BatchNormalization(momentum=0.9, gamma_initializer="zeros", name=name + "pw_bn")(nn)
+        #nn = keras.layers.BatchNormalization(momentum=0.9, name=name + "pw_bn")(nn)
+    elif use_output_norm:
         nn = keras.layers.BatchNormalization(momentum=0.9, name=name + "pw_bn")(nn)
     nn = keras.layers.Dropout(rate=drop_rate, name=name + "dropout")(nn)
 
@@ -199,6 +225,7 @@ def EfficientViT_B(
     dropout=0,
     use_norm=True,
     initializer=None,
+    anti_aliasing=False,
     model_name="efficientvit",
     kwargs=None
 ):
@@ -212,16 +239,29 @@ def EfficientViT_B(
     activation_func = eval(activation)
 
     """ stage 0, Stem_stage """
-    nn = keras.layers.Conv2D(
-        stem_width,
-        3,
-        strides=2,
-        padding="same",
-        kernel_initializer=initializer,
-        name="stem_conv")(inputs)
-    if use_norm:
-        nn = keras.layers.BatchNormalization(momentum=0.9, name="stem_bn")(nn)
-    nn = keras.layers.Activation(activation_func, name="stem_activation_")(nn)
+    if anti_aliasing:
+        nn = keras.layers.Conv2D(
+            stem_width,
+            3,
+            strides=1,
+            padding="same",
+            kernel_initializer=initializer,
+            name="stem_conv")(inputs)
+        if use_norm:
+            nn = keras.layers.BatchNormalization(momentum=0.9, name="stem_bn")(nn)
+        nn = keras.layers.Activation(activation_func, name="stem_activation_")(nn)
+        nn = Blur2D(kernel_size=3, stride=2, padding='same')(nn)
+    else:
+        nn = keras.layers.Conv2D(
+            stem_width,
+            3,
+            strides=2,
+            padding="same",
+            kernel_initializer=initializer,
+            name="stem_conv")(inputs)
+        if use_norm:
+            nn = keras.layers.BatchNormalization(momentum=0.9, name="stem_bn")(nn)
+        nn = keras.layers.Activation(activation_func, name="stem_activation_")(nn)
 
     nn = mb_conv(
         nn,
@@ -233,6 +273,7 @@ def EfficientViT_B(
         use_output_norm=use_norm,
         activation=activation,
         initializer=initializer,
+        anti_aliasing=anti_aliasing,
         name="stem_MB_")
 
     """ stage [1, 2, 3, 4] """ # 1/4, 1/8, 1/16, 1/32
@@ -273,6 +314,7 @@ def EfficientViT_B(
                     drop_rate=block_drop_rate,
                     activation=activation,
                     initializer=initializer,
+                    anti_aliasing=anti_aliasing,
                     name=cur_name)
             else:
                 num_heads = out_channel // head_dimension
@@ -300,6 +342,7 @@ def EfficientViT_B(
                     drop_rate=block_drop_rate,
                     activation=activation,
                     initializer=initializer,
+                    anti_aliasing=anti_aliasing,
                     name=name)
             global_block_id += 1
 
@@ -317,3 +360,25 @@ def EfficientViT_B(
     model = keras.models.Model(inputs, nn, name=model_name)
 
     return model
+
+
+class Blur2D(keras.layers.Layer):
+  def __init__(self, kernel_size=5, stride=2, padding='same'):
+    super(Blur2D, self).__init__()
+    self.kernel_size = kernel_size
+    self.stride = stride
+    self.padding = padding
+
+  def build(self, input_shape):
+    # Define a simple averaging kernel
+    self.kernel = keras.ops.ones((self.kernel_size, self.kernel_size, input_shape[-1], 1)) / (self.kernel_size ** 2)
+
+  def call(self, inputs):
+    # Apply depthwise convolution for blurring
+    blurred = keras.ops.depthwise_conv(
+        inputs,
+        self.kernel,
+        strides=(self.stride, self.stride), 
+        padding=self.padding
+    )
+    return blurred 
