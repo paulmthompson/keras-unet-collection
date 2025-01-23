@@ -31,6 +31,7 @@ mostly to make it Keras3 compatible.
 """
 
 import keras 
+import numpy as np
 
 
 def mb_conv(
@@ -64,7 +65,11 @@ def mb_conv(
                 padding="same",
                 kernel_initializer=initializer,
                 name=name and name + "expand_conv")(inputs)
-            nn = Blur2D(kernel_size=5, stride=strides, padding='same')(nn)
+            nn = Blur2D(
+                kernel_size=5,
+                stride=strides,
+                kernel_type="Binomial",
+                padding='same')(nn)
         else:
             nn = keras.layers.Conv2D(
                 int(input_channel * expansion),
@@ -100,7 +105,11 @@ def mb_conv(
                 padding="same",
                 depthwise_initializer=initializer,
                 name=name + "dw_conv")(nn)
-            nn = Blur2D(kernel_size=3, stride=strides, padding='same')(nn)
+            nn = Blur2D(
+                kernel_size=5, 
+                stride=strides,
+                kernel_type="Binomial",
+                padding='same')(nn)
         else:
             nn = keras.layers.DepthwiseConv2D(
                 3,
@@ -182,8 +191,8 @@ def lite_mhsa(inputs,
 
     qkv = keras.ops.reshape(qkv, [-1, height * width, qkv.shape[-1] // (3 * key_dim), 3 * key_dim])
     query, key, value = keras.ops.split(qkv, 3, axis=-1)
-    query = keras.ops.transpose(query, [0, 2, 1, 3])
-    key = keras.ops.transpose(key, [0, 2, 3, 1])
+    query = keras.ops.transpose(query, [0, 2, 1, 3]) # [batch, num_heads, q_blocks, key_dim]
+    key = keras.ops.transpose(key, [0, 2, 3, 1]) # [batch, num_heads, key_dim, k_blocks]
     value = keras.ops.transpose(value, [0, 2, 1, 3])
 
     activation_func = eval(activation)
@@ -250,7 +259,7 @@ def EfficientViT_B(
         if use_norm:
             nn = keras.layers.BatchNormalization(momentum=0.9, name="stem_bn")(nn)
         nn = keras.layers.Activation(activation_func, name="stem_activation_")(nn)
-        nn = Blur2D(kernel_size=3, stride=2, padding='same')(nn)
+        nn = Blur2D(kernel_size=5, stride=2, kernel_type="Binomial", padding='same')(nn)
     else:
         nn = keras.layers.Conv2D(
             stem_width,
@@ -285,6 +294,8 @@ def EfficientViT_B(
 
         block_use_bias, block_use_norm = (True, False) if stack_id >= 2 else (False, True)  # fewer_norm
 
+        block_anti_aliasing = anti_aliasing if stack_id <= 2 else False
+
         if not use_norm:
             block_use_norm = False
             block_use_bias = True
@@ -314,7 +325,7 @@ def EfficientViT_B(
                     drop_rate=block_drop_rate,
                     activation=activation,
                     initializer=initializer,
-                    anti_aliasing=anti_aliasing,
+                    anti_aliasing=block_anti_aliasing,
                     name=cur_name)
             else:
                 num_heads = out_channel // head_dimension
@@ -342,7 +353,7 @@ def EfficientViT_B(
                     drop_rate=block_drop_rate,
                     activation=activation,
                     initializer=initializer,
-                    anti_aliasing=anti_aliasing,
+                    anti_aliasing=block_anti_aliasing,
                     name=name)
             global_block_id += 1
 
@@ -362,23 +373,69 @@ def EfficientViT_B(
     return model
 
 
+
 class Blur2D(keras.layers.Layer):
-  def __init__(self, kernel_size=5, stride=2, padding='same'):
-    super(Blur2D, self).__init__()
-    self.kernel_size = kernel_size
-    self.stride = stride
-    self.padding = padding
+    def __init__(self, kernel_size=2, stride=2, kernel_type="Rect", padding="valid"):
+        super(Blur2D, self).__init__()
 
-  def build(self, input_shape):
-    # Define a simple averaging kernel
-    self.kernel = keras.ops.ones((self.kernel_size, self.kernel_size, input_shape[-1], 1)) / (self.kernel_size ** 2)
+        self.kernel_size = kernel_size
+        if kernel_type == "Rect":
 
-  def call(self, inputs):
-    # Apply depthwise convolution for blurring
-    blurred = keras.ops.depthwise_conv(
-        inputs,
-        self.kernel,
-        strides=(self.stride, self.stride), 
-        padding=self.padding
-    )
-    return blurred 
+            self.kernel2d = keras.ops.ones((self.kernel_size, self.kernel_size, 1, 1))
+            self.kernel2d = keras.ops.divide(
+                self.kernel2d, keras.ops.sum(self.kernel2d)
+            )
+
+        elif kernel_type == "Triangle":
+            # Assert that kernel is > 2 else print error
+            assert (
+                kernel_size > 2
+            ), "Kernel size must be greater than 2 for Triangle kernel"
+
+            if kernel_size % 2 == 0:
+                kernel_base = np.arange(1, (kernel_size + 1) // 2 + 1)
+                # mirror the kernel_base
+                kernel_base = np.concatenate([kernel_base, np.flip(kernel_base)])
+            else:
+                kernel_base = np.arange(1, (kernel_size + 1) // 2 + 1)
+                # mirror the kernel_base
+                kernel_base = np.concatenate([kernel_base, np.flip(kernel_base[:-1])])
+
+            self.kernel2d = keras.ops.expand_dims(
+                keras.ops.outer(kernel_base, kernel_base), axis=(2, 3)
+            )
+            self.kernel2d = keras.ops.cast(self.kernel2d, "float32")
+            self.kernel2d = keras.ops.divide(
+                self.kernel2d, keras.ops.sum(self.kernel2d)
+            )
+        elif kernel_type == "Binomial":
+
+            assert kernel_size == 5, "Binomial kernel only supports kernel size of 5"
+
+            kernel = np.array([1, 4, 6, 4, 1])
+            self.kernel2d = keras.ops.expand_dims(
+                keras.ops.outer(kernel, kernel), axis=(2, 3)
+            )
+            self.kernel2d = keras.ops.cast(self.kernel2d, "float32")
+            self.kernel2d = keras.ops.divide(
+                self.kernel2d, keras.ops.sum(self.kernel2d)
+            )
+        else:
+            raise ValueError("Kernel type must be either Rect, Triangle, or Binomial")
+
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+
+    def build(self, input_shape):
+        self.kernel = keras.ops.tile(self.kernel2d, [1, 1, input_shape[-1], 1])
+
+    def call(self, inputs):
+        # Apply depthwise convolution for blurring
+        blurred = keras.ops.depthwise_conv(
+            inputs,
+            self.kernel,
+            strides=(self.stride, self.stride),
+            padding=self.padding,
+        )
+        return blurred
